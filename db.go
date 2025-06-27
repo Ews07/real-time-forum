@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -48,5 +49,24 @@ func InsertUserFull(db *sql.DB, uuid, nickname, email, passwordHash string, age 
 	stmt := `INSERT INTO users (uuid, nickname, email, password_hash, age, gender, first_name, last_name) 
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := db.Exec(stmt, uuid, nickname, email, passwordHash, age, gender, firstName, lastName)
+	return err
+}
+
+// GetUserByEmailOrNickname fetches user with matching email OR nickname
+func GetUserByEmailOrNickname(db *sql.DB, identifier string) (uuid, hashedPassword string, err error) {
+	query := `SELECT uuid, password_hash FROM users WHERE email = ? OR nickname = ?`
+	return getUserAuth(db, query, identifier)
+}
+
+func getUserAuth(db *sql.DB, query, id string) (string, string, error) {
+	var uuid, hash string
+	err := db.QueryRow(query, id, id).Scan(&uuid, &hash)
+	return uuid, hash, err
+}
+
+// CreateSession inserts a session for a user
+func CreateSession(db *sql.DB, sessionUUID, userUUID string, expiresAt time.Time) error {
+	stmt := `INSERT INTO sessions (session_uuid, user_uuid, expires_at) VALUES (?, ?, ?)`
+	_, err := db.Exec(stmt, sessionUUID, userUUID, expiresAt)
 	return err
 }

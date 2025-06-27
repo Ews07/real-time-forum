@@ -24,6 +24,8 @@ func main() {
 
 	r.HandleFunc("/register", RegisterHandler(db)).Methods("POST")
 
+	r.HandleFunc("/login", LoginHandler(db)).Methods("POST")
+
 	// Start server
 	log.Println("Starting server on http://localhost:8080")
 	err = http.ListenAndServe(":8080", r)

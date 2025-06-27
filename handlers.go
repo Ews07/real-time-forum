@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -74,5 +75,61 @@ func RegisterHandler(db *sql.DB) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusCreated)
 		w.Write([]byte("User registered successfully"))
+	}
+}
+
+type LoginRequest struct {
+	Identifier string `json:"identifier"` // email or nickname
+	Password   string `json:"password"`
+}
+
+func LoginHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req LoginRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		// Basic input validation
+		if req.Identifier == "" || req.Password == "" {
+			http.Error(w, "Missing credentials", http.StatusBadRequest)
+			return
+		}
+
+		// Get user by email or nickname
+		userUUID, hashedPassword, err := GetUserByEmailOrNickname(db, req.Identifier)
+		if err != nil {
+			http.Error(w, "Invalid email/nickname or password", http.StatusUnauthorized)
+			return
+		}
+
+		// Compare password
+		if !CheckPasswordHash(hashedPassword, req.Password) {
+			http.Error(w, "Invalid email/nickname or password", http.StatusUnauthorized)
+			return
+		}
+
+		// Create session UUID and expiry
+		sessionUUID := uuid.New().String()
+		expiresAt := time.Now().Add(24 * time.Hour)
+
+		// Save session in DB
+		err = CreateSession(db, sessionUUID, userUUID, expiresAt)
+		if err != nil {
+			http.Error(w, "Server error", http.StatusInternalServerError)
+			return
+		}
+
+		// Set cookie with session UUID
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session_token",
+			Value:    sessionUUID,
+			Expires:  expiresAt,
+			HttpOnly: true,
+			Path:     "/",
+		})
+
+		w.Write([]byte("Login successful"))
 	}
 }

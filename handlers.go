@@ -133,3 +133,34 @@ func LoginHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Login successful"))
 	}
 }
+
+func LogoutHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session_token")
+		if err != nil {
+			http.Error(w, "No session found", http.StatusUnauthorized)
+			return
+		}
+
+		sessionToken := cookie.Value
+
+		// Delete session from DB
+		err = DeleteSession(db, sessionToken)
+		if err != nil {
+			http.Error(w, "Error logging out", http.StatusInternalServerError)
+			return
+		}
+
+		// Expire the session cookie
+		expiredCookie := &http.Cookie{
+			Name:     "session_token",
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+		}
+		http.SetCookie(w, expiredCookie)
+
+		w.Write([]byte("Logged out successfully"))
+	}
+}

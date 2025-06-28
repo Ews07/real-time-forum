@@ -17,14 +17,9 @@ func main() {
 
 	r := mux.NewRouter()
 
-	// simple health check
-	r.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("OK"))
-	}).Methods("GET")
-
 	r.HandleFunc("/register", RegisterHandler(db)).Methods("POST")
-
 	r.HandleFunc("/login", LoginHandler(db)).Methods("POST")
+	r.Handle("/logout", AuthMiddleware(db, LogoutHandler(db))).Methods("POST")
 
 	// Start server
 	log.Println("Starting server on http://localhost:8080")

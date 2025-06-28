@@ -108,3 +108,9 @@ func GetSession(db *sql.DB, sessionUUID string) (*Session, error) {
 
 	return &s, nil
 }
+
+func DeleteSession(db *sql.DB, sessionUUID string) error {
+    stmt := "DELETE FROM sessions WHERE session_uuid = ?"
+    _, err := db.Exec(stmt, sessionUUID)
+    return err
+}

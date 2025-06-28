@@ -44,6 +44,20 @@ func UserExists(db *sql.DB, email, nickname string) (bool, error) {
 	return exists, err
 }
 
+/*
+  for security we can add:
+  	// Only allow "email" or "nickname" as column names
+	validColumns := map[string]bool{
+		"email": true,
+		"nickname": true,
+	}
+	
+	if !validColumns[input] {
+		fmt.Println("Invalid column name")
+		return false, nil
+	}
+*/
+
 // Insert user with all fields
 func InsertUserFull(db *sql.DB, uuid, nickname, email, passwordHash string, age int, gender, firstName, lastName string) error {
 	stmt := `INSERT INTO users (uuid, nickname, email, password_hash, age, gender, first_name, last_name) 
@@ -69,4 +83,28 @@ func CreateSession(db *sql.DB, sessionUUID, userUUID string, expiresAt time.Time
 	stmt := `INSERT INTO sessions (session_uuid, user_uuid, expires_at) VALUES (?, ?, ?)`
 	_, err := db.Exec(stmt, sessionUUID, userUUID, expiresAt)
 	return err
+}
+
+var ErrSessionNotFound = errors.New("session not found or expired")
+
+type Session struct {
+	SessionUUID string
+	UserUUID string
+	ExpiresAt time.Time
+}
+
+//GetSession returns session info if session exists and valid
+func GetSession(db *sql.DB, sessionUUID string) (*Session, error) {
+	var s Session
+	query := "SELECT session_uuid, user_uuid, expires_at FROM sessions WHERE session_uuid = ?"
+	err := db.QueryRow(query, sessionUUID).Scan(&s.SessionUUID, &s.UserUUID, &s.ExpiresAt)
+	if err != nil {
+		return nil, ErrSessionNotFound
+	}
+
+	if time.Now().After(s.ExpiresAt) {
+		return nil, ErrSessionNotFound
+	}
+
+	return &s, nil
 }

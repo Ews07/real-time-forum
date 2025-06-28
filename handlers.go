@@ -164,3 +164,52 @@ func LogoutHandler(db *sql.DB) http.HandlerFunc {
 		w.Write([]byte("Logged out successfully"))
 	}
 }
+
+
+type CreatePostRequest struct {
+    Title      string   `json:"title"`
+    Content    string   `json:"content"`
+    Categories []string `json:"categories"`
+}
+
+func CreatePostHandler(db *sql.DB) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        userUUID, ok := UserUUIDFromContext(r.Context())
+        if !ok {
+            http.Error(w, "Unauthorized", http.StatusUnauthorized)
+            return
+        }
+
+        var req CreatePostRequest
+        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+            http.Error(w, "Invalid JSON", http.StatusBadRequest)
+            return
+        }
+
+        req.Title = strings.TrimSpace(req.Title)
+        req.Content = strings.TrimSpace(req.Content)
+
+        if req.Title == "" || req.Content == "" {
+            http.Error(w, "Title and content are required", http.StatusBadRequest)
+            return
+        }
+
+        postUUID := uuid.New().String()
+        now := time.Now()
+
+        err := InsertPost(db, postUUID, userUUID, req.Title, req.Content, now)
+        if err != nil {
+            http.Error(w, "Failed to insert post", http.StatusInternalServerError)
+            return
+        }
+
+        err = InsertPostCategories(db, postUUID, req.Categories)
+        if err != nil {
+            http.Error(w, "Failed to insert categories", http.StatusInternalServerError)
+            return
+        }
+
+        w.WriteHeader(http.StatusCreated)
+        w.Write([]byte("Post created successfully"))
+    }
+}

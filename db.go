@@ -114,3 +114,20 @@ func DeleteSession(db *sql.DB, sessionUUID string) error {
     _, err := db.Exec(stmt, sessionUUID)
     return err
 }
+
+func InsertPost(db *sql.DB, postUUID, userUUID, title, content string, createdAt time.Time) error {
+    stmt := "INSERT INTO posts (uuid, user_uuid, title, content, created_at) VALUES (?, ?, ?, ?, ?)"
+    _, err := db.Exec(stmt, postUUID, userUUID, title, content, createdAt)
+    return err
+}
+
+func InsertPostCategories(db *sql.DB, postUUID string, categories []string) error {
+    stmt := "INSERT INTO post_categories (post_uuid, category) VALUES (?, ?)"
+    for _, cat := range categories {
+        _, err := db.Exec(stmt, postUUID, cat)
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}

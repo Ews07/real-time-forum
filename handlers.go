@@ -244,6 +244,11 @@ func WebSocketHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		clients[userUUID] = client
+		onlineUsers[userUUID] = &UserPresence{
+			UserUUID:    userUUID,
+			IsOnline:    true,
+			LastMessage: "",
+		}
 
 		go writePump(client)
 		readPump(db, client)

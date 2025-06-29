@@ -27,15 +27,56 @@ type Message struct {
 	SentAt  string `json:"sent_at"`
 }
 
+type UserPresence struct {
+	UserUUID    string
+	LastMessage string // preview or timestamp
+	IsOnline    bool
+}
+
+var onlineUsers = make(map[string]*UserPresence) // key = userUUID
+
 func handleMessages() {
 	for {
 		msg := <-broadcast
+
+		// Save/update last message in memory
+		if u, ok := onlineUsers[msg.To]; ok {
+			u.LastMessage = msg.Content
+		}
 
 		// If receiver is online, send the message directly
 		if client, ok := clients[msg.To]; ok {
 			data, _ := json.Marshal(msg)
 			client.Send <- data
 		}
+
+		// Optionally send back to sender as confirmation
+		if sender, ok := clients[msg.From]; ok {
+			data, _ := json.Marshal(msg)
+			sender.Send <- data
+		}
+
+		// Broadcast updated online user list to all clients
+		sendOnlineUsersToAll()
+
+	}
+}
+
+func sendOnlineUsersToAll() {
+	users := []UserPresence{}
+	for _, u := range onlineUsers {
+		users = append(users, *u)
+	}
+
+	data := map[string]interface{}{
+		"type":  "user_list",
+		"users": users,
+	}
+
+	encoded, _ := json.Marshal(data)
+
+	for _, client := range clients {
+		client.Send <- encoded
 	}
 }
 
@@ -43,6 +84,9 @@ func readPump(db *sql.DB, client *Client) {
 	defer func() {
 		client.Conn.Close()
 		delete(clients, client.UserUUID)
+		if u, ok := onlineUsers[client.UserUUID]; ok {
+			u.IsOnline = false
+		}
 	}()
 
 	for {

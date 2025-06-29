@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 type RegisterRequest struct {
@@ -19,6 +20,15 @@ type RegisterRequest struct {
 	LastName  string `json:"last_name"`
 	Email     string `json:"email"`
 	Password  string `json:"password"`
+}
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		return origin == "http://localhost:8080"
+	},
 }
 
 func RegisterHandler(db *sql.DB) http.HandlerFunc {
@@ -165,51 +175,77 @@ func LogoutHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-
 type CreatePostRequest struct {
-    Title      string   `json:"title"`
-    Content    string   `json:"content"`
-    Categories []string `json:"categories"`
+	Title      string   `json:"title"`
+	Content    string   `json:"content"`
+	Categories []string `json:"categories"`
 }
 
 func CreatePostHandler(db *sql.DB) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        userUUID, ok := UserUUIDFromContext(r.Context())
-        if !ok {
-            http.Error(w, "Unauthorized", http.StatusUnauthorized)
-            return
-        }
+	return func(w http.ResponseWriter, r *http.Request) {
+		userUUID, ok := UserUUIDFromContext(r.Context())
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
 
-        var req CreatePostRequest
-        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-            http.Error(w, "Invalid JSON", http.StatusBadRequest)
-            return
-        }
+		var req CreatePostRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
 
-        req.Title = strings.TrimSpace(req.Title)
-        req.Content = strings.TrimSpace(req.Content)
+		req.Title = strings.TrimSpace(req.Title)
+		req.Content = strings.TrimSpace(req.Content)
 
-        if req.Title == "" || req.Content == "" {
-            http.Error(w, "Title and content are required", http.StatusBadRequest)
-            return
-        }
+		if req.Title == "" || req.Content == "" {
+			http.Error(w, "Title and content are required", http.StatusBadRequest)
+			return
+		}
 
-        postUUID := uuid.New().String()
-        now := time.Now()
+		postUUID := uuid.New().String()
+		now := time.Now()
 
-        err := InsertPost(db, postUUID, userUUID, req.Title, req.Content, now)
-        if err != nil {
-            http.Error(w, "Failed to insert post", http.StatusInternalServerError)
-            return
-        }
+		err := InsertPost(db, postUUID, userUUID, req.Title, req.Content, now)
+		if err != nil {
+			http.Error(w, "Failed to insert post", http.StatusInternalServerError)
+			return
+		}
 
-        err = InsertPostCategories(db, postUUID, req.Categories)
-        if err != nil {
-            http.Error(w, "Failed to insert categories", http.StatusInternalServerError)
-            return
-        }
+		err = InsertPostCategories(db, postUUID, req.Categories)
+		if err != nil {
+			http.Error(w, "Failed to insert categories", http.StatusInternalServerError)
+			return
+		}
 
-        w.WriteHeader(http.StatusCreated)
-        w.Write([]byte("Post created successfully"))
-    }
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte("Post created successfully"))
+	}
+}
+
+func WebSocketHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userUUID, ok := UserUUIDFromContext(r.Context())
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println("WebSocket upgrade error:", err)
+			return
+		}
+
+		client := &Client{
+			Conn:     conn,
+			UserUUID: userUUID,
+			Send:     make(chan []byte),
+		}
+
+		clients[userUUID] = client
+
+		go writePump(client)
+		readPump(db, client)
+	}
 }

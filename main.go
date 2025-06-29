@@ -21,6 +21,9 @@ func main() {
 	r.HandleFunc("/login", LoginHandler(db)).Methods("POST")
 	r.Handle("/logout", AuthMiddleware(db, LogoutHandler(db))).Methods("POST")
 	r.Handle("/posts", AuthMiddleware(db, CreatePostHandler(db))).Methods("POST")
+	r.Handle("/ws", AuthMiddleware(db, WebSocketHandler(db))).Methods("GET")
+
+	go handleMessages()
 	// Start server
 	log.Println("Starting server on http://localhost:8080")
 	err = http.ListenAndServe(":8080", r)

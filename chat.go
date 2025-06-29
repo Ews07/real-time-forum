@@ -56,8 +56,6 @@ func readPump(db *sql.DB, client *Client) {
 		msg.From = client.UserUUID
 		msg.SentAt = time.Now().Format(time.RFC3339)
 
-		// TODO: save message to DB here in Part 3
-
 		broadcast <- msg
 	}
 }

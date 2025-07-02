@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -252,5 +253,28 @@ func WebSocketHandler(db *sql.DB) http.HandlerFunc {
 
 		go writePump(client)
 		readPump(db, client)
+	}
+}
+
+func GetMessagesHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userUUID, ok := UserUUIDFromContext(r.Context())
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		otherUser := r.URL.Query().Get("with")
+		offsetStr := r.URL.Query().Get("offset")
+		offset, _ := strconv.Atoi(offsetStr)
+
+		messages, err := LoadMessages(db, userUUID, otherUser, 10, offset)
+		if err != nil {
+			http.Error(w, "Failed to fetch messages", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(messages)
 	}
 }

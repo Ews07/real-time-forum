@@ -51,7 +51,7 @@ func UserExists(db *sql.DB, email, nickname string) (bool, error) {
 		"email": true,
 		"nickname": true,
 	}
-	
+
 	if !validColumns[input] {
 		fmt.Println("Invalid column name")
 		return false, nil
@@ -89,11 +89,11 @@ var ErrSessionNotFound = errors.New("session not found or expired")
 
 type Session struct {
 	SessionUUID string
-	UserUUID string
-	ExpiresAt time.Time
+	UserUUID    string
+	ExpiresAt   time.Time
 }
 
-//GetSession returns session info if session exists and valid
+// GetSession returns session info if session exists and valid
 func GetSession(db *sql.DB, sessionUUID string) (*Session, error) {
 	var s Session
 	query := "SELECT session_uuid, user_uuid, expires_at FROM sessions WHERE session_uuid = ?"
@@ -110,24 +110,64 @@ func GetSession(db *sql.DB, sessionUUID string) (*Session, error) {
 }
 
 func DeleteSession(db *sql.DB, sessionUUID string) error {
-    stmt := "DELETE FROM sessions WHERE session_uuid = ?"
-    _, err := db.Exec(stmt, sessionUUID)
-    return err
+	stmt := "DELETE FROM sessions WHERE session_uuid = ?"
+	_, err := db.Exec(stmt, sessionUUID)
+	return err
 }
 
 func InsertPost(db *sql.DB, postUUID, userUUID, title, content string, createdAt time.Time) error {
-    stmt := "INSERT INTO posts (uuid, user_uuid, title, content, created_at) VALUES (?, ?, ?, ?, ?)"
-    _, err := db.Exec(stmt, postUUID, userUUID, title, content, createdAt)
-    return err
+	stmt := "INSERT INTO posts (uuid, user_uuid, title, content, created_at) VALUES (?, ?, ?, ?, ?)"
+	_, err := db.Exec(stmt, postUUID, userUUID, title, content, createdAt)
+	return err
 }
 
 func InsertPostCategories(db *sql.DB, postUUID string, categories []string) error {
-    stmt := "INSERT INTO post_categories (post_uuid, category) VALUES (?, ?)"
-    for _, cat := range categories {
-        _, err := db.Exec(stmt, postUUID, cat)
-        if err != nil {
-            return err
-        }
-    }
-    return nil
+	stmt := "INSERT INTO post_categories (post_uuid, category) VALUES (?, ?)"
+	for _, cat := range categories {
+		_, err := db.Exec(stmt, postUUID, cat)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func SaveMessage(db *sql.DB, uuid, sender, receiver, content string, createdAt time.Time) error {
+	stmt := `
+        INSERT INTO messages (uuid, sender_uuid, receiver_uuid, content, created_at)
+        VALUES (?, ?, ?, ?, ?)`
+	_, err := db.Exec(stmt, uuid, sender, receiver, content, createdAt)
+	return err
+}
+
+func LoadMessages(db *sql.DB, userA, userB string, limit, offset int) ([]Message, error) {
+	stmt := `
+        SELECT sender_uuid, receiver_uuid, content, created_at
+        FROM messages
+        WHERE (sender_uuid = ? AND receiver_uuid = ?)
+           OR (sender_uuid = ? AND receiver_uuid = ?)
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?`
+
+	rows, err := db.Query(stmt, userA, userB, userB, userA, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []Message
+	for rows.Next() {
+		var m Message
+		var createdAt time.Time
+		rows.Scan(&m.From, &m.To, &m.Content, &createdAt)
+		m.SentAt = createdAt.Format(time.RFC3339)
+		messages = append(messages, m)
+	}
+
+	// Reverse to return oldest-to-newest
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
+	return messages, nil
 }

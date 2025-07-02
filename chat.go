@@ -6,7 +6,14 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+)
+
+var (
+	clients     = make(map[string]*Client)       // key = user UUID
+	broadcast   = make(chan Message)             // channel for incoming messages
+	onlineUsers = make(map[string]*UserPresence) // key = userUUID
 )
 
 type Client struct {
@@ -14,11 +21,6 @@ type Client struct {
 	UserUUID string
 	Send     chan []byte
 }
-
-var (
-	clients   = make(map[string]*Client) // key = user UUID
-	broadcast = make(chan Message)       // channel for incoming messages
-)
 
 type Message struct {
 	From    string `json:"from"`
@@ -32,8 +34,6 @@ type UserPresence struct {
 	LastMessage string // preview or timestamp
 	IsOnline    bool
 }
-
-var onlineUsers = make(map[string]*UserPresence) // key = userUUID
 
 func handleMessages() {
 	for {
@@ -99,6 +99,8 @@ func readPump(db *sql.DB, client *Client) {
 
 		msg.From = client.UserUUID
 		msg.SentAt = time.Now().Format(time.RFC3339)
+
+		SaveMessage(db, uuid.New().String(), msg.From, msg.To, msg.Content, time.Now())
 
 		broadcast <- msg
 	}

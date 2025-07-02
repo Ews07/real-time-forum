@@ -256,6 +256,7 @@ func WebSocketHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+//fetch chat history
 func GetMessagesHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userUUID, ok := UserUUIDFromContext(r.Context())

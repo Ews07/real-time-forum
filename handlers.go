@@ -224,6 +224,47 @@ func CreatePostHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+type CreateCommentRequest struct {
+	PostUUID string `json:"post_uuid"`
+	Content  string `json:"content"`
+}
+
+func CreateCommentHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userUUID, ok := UserUUIDFromContext(r.Context())
+		if !ok {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		var req CreateCommentRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		req.Content = strings.TrimSpace(req.Content)
+		req.PostUUID = strings.TrimSpace(req.PostUUID)
+
+		if req.Content == "" || req.PostUUID == "" {
+			http.Error(w, "Missing content or post ID", http.StatusBadRequest)
+			return
+		}
+
+		commentUUID := uuid.New().String()
+		createdAt := time.Now()
+
+		err := InsertComment(db, commentUUID, req.PostUUID, userUUID, req.Content, createdAt)
+		if err != nil {
+			http.Error(w, "Failed to insert comment", http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte("Comment added successfully"))
+	}
+}
+
 func WebSocketHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userUUID, ok := UserUUIDFromContext(r.Context())

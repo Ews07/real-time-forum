@@ -241,3 +241,10 @@ func LoadMessages(db *sql.DB, userA, userB string, limit, offset int) ([]Message
 
 	return messages, nil
 }
+
+func InsertComment(db *sql.DB, commentUUID, postUUID, userUUID, content string, createdAt time.Time) error {
+    stmt := `INSERT INTO comments (uuid, post_uuid, user_uuid, content, created_at)
+             VALUES (?, ?, ?, ?, ?)`
+    _, err := db.Exec(stmt, commentUUID, postUUID, userUUID, content, createdAt)
+    return err
+}

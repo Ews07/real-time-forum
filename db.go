@@ -114,6 +114,76 @@ func DeleteSession(db *sql.DB, sessionUUID string) error {
 	_, err := db.Exec(stmt, sessionUUID)
 	return err
 }
+type Post struct {
+    UUID       string    `json:"uuid"`
+    Title      string    `json:"title"`
+    Content    string    `json:"content"`
+    AuthorUUID string    `json:"author_uuid"`
+    CreatedAt  time.Time `json:"created_at"`
+    Categories []string  `json:"categories"`
+}
+
+// Fetch posts optionally filtered by category
+func GetPosts(db *sql.DB, categoryFilter string) ([]Post, error) {
+    var rows *sql.Rows
+    var err error
+
+    if categoryFilter != "" {
+        query := `
+            SELECT DISTINCT p.uuid, p.title, p.content, p.user_uuid, p.created_at
+            FROM posts p
+            JOIN post_categories pc ON p.uuid = pc.post_uuid
+            WHERE pc.category = ?
+            ORDER BY p.created_at DESC`
+        rows, err = db.Query(query, categoryFilter)
+    } else {
+        query := `
+            SELECT uuid, title, content, user_uuid, created_at
+            FROM posts
+            ORDER BY created_at DESC`
+        rows, err = db.Query(query)
+    }
+
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var posts []Post
+    for rows.Next() {
+        var p Post
+        if err := rows.Scan(&p.UUID, &p.Title, &p.Content, &p.AuthorUUID, &p.CreatedAt); err != nil {
+            return nil, err
+        }
+
+        cats, err := GetPostCategories(db, p.UUID)
+        if err != nil {
+            return nil, err
+        }
+        p.Categories = cats
+        posts = append(posts, p)
+    }
+
+    return posts, nil
+}
+
+// GetPostCategories returns all categories for a post
+func GetPostCategories(db *sql.DB, postUUID string) ([]string, error) {
+    rows, err := db.Query(`SELECT category FROM post_categories WHERE post_uuid = ?`, postUUID)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var categories []string
+    for rows.Next() {
+        var cat string
+        rows.Scan(&cat)
+        categories = append(categories, cat)
+    }
+
+    return categories, nil
+}
 
 func InsertPost(db *sql.DB, postUUID, userUUID, title, content string, createdAt time.Time) error {
 	stmt := "INSERT INTO posts (uuid, user_uuid, title, content, created_at) VALUES (?, ?, ?, ?, ?)"

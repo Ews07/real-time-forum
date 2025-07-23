@@ -30,30 +30,30 @@ CREATE TABLE IF NOT EXISTS categories (
 -- Posts table
 CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT UNIQUE NOT NULL,
     user_uuid TEXT NOT NULL,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME NOT NULL,
     FOREIGN KEY(user_uuid) REFERENCES users(uuid)
 );
 
 -- PostCategories (Many-to-Many relation)
 CREATE TABLE IF NOT EXISTS post_categories (
-    post_id INTEGER NOT NULL,
-    category_id INTEGER NOT NULL,
-    PRIMARY KEY (post_id, category_id),
-    FOREIGN KEY(post_id) REFERENCES posts(id),
-    FOREIGN KEY(category_id) REFERENCES categories(id)
+    post_uuid TEXT NOT NULL,
+    category TEXT NOT NULL,
+    FOREIGN KEY(post_uuid) REFERENCES posts(uuid)
 );
 
 -- Comments table
 CREATE TABLE IF NOT EXISTS comments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    post_id INTEGER NOT NULL,
+    uuid TEXT UNIQUE NOT NULL,
+    post_uuid TEXT NOT NULL,
     user_uuid TEXT NOT NULL,
     content TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY(post_id) REFERENCES posts(id),
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY(post_uuid) REFERENCES posts(uuid),
     FOREIGN KEY(user_uuid) REFERENCES users(uuid)
 );
 

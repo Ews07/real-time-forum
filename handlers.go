@@ -256,7 +256,7 @@ func WebSocketHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-//fetch chat history
+// fetch chat history
 func GetMessagesHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userUUID, ok := UserUUIDFromContext(r.Context())
@@ -277,5 +277,20 @@ func GetMessagesHandler(db *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(messages)
+	}
+}
+
+func PostFeedHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		category := r.URL.Query().Get("category") // optional ?category=general
+
+		posts, err := GetPosts(db, category)
+		if err != nil {
+			http.Error(w, "Failed to fetch posts", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(posts)
 	}
 }
